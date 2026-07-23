@@ -42,13 +42,31 @@ function Notes() {
     fetchFlashcardData();
   }, []);
 
+  // Helper function to safely parse user ID from session
+  const getStudentId = () => {
+    const activeSession = localStorage.getItem("userSession");
+    if (!activeSession) return null;
+
+    try {
+      const { email: sessionEmail } = JSON.parse(activeSession);
+      if (!sessionEmail) return null;
+
+      const rawId = sessionEmail.split("@")[0];
+      // Convert to integer if it's strictly numeric, otherwise return string
+      return !isNaN(rawId) && rawId.trim() !== "" ? parseInt(rawId, 10) : rawId;
+    } catch (e) {
+      console.error("Session parse error:", e);
+      return null;
+    }
+  };
+
   // 1. FETCH SCANNED NOTES FILTERED STRICTLY BY CURRENT USER ID
   const fetchNotes = async () => {
-    const activeSession = localStorage.getItem("userSession");
-    if (!activeSession) return;
-
-    const { email: sessionEmail } = JSON.parse(activeSession);
-    const studentId = sessionEmail.split("@")[0];
+    const studentId = getStudentId();
+    if (!studentId) {
+      setLoading(false);
+      return;
+    }
 
     setLoading(true);
     try {
@@ -61,7 +79,7 @@ function Notes() {
       if (error) throw error;
       setNotesList(data || []);
     } catch (err) {
-      console.error("Error fetching notes:", err.message);
+      console.error("Error fetching notes:", err);
       toast.error("Failed to load notes");
     } finally {
       setLoading(false);
@@ -70,18 +88,17 @@ function Notes() {
 
   // 2. FETCH USER SUBJECTS & FLASHCARDS FOR ACTIVE SESSION
   const fetchFlashcardData = async () => {
-    const activeSession = localStorage.getItem("userSession");
-    if (!activeSession) return;
-
-    const { email: sessionEmail } = JSON.parse(activeSession);
-    const studentId = sessionEmail.split("@")[0];
+    const studentId = getStudentId();
+    if (!studentId) return;
 
     // Fetch User Enrolled Subjects
     try {
-      const { data: subjectsData } = await supabase
+      const { data: subjectsData, error: subErr } = await supabase
         .from("subjects")
         .select("*")
         .eq("user_id", studentId);
+
+      if (subErr) console.error("Error fetching subjects:", subErr);
 
       setSubjectsList(subjectsData || []);
       if (subjectsData && subjectsData.length > 0) {
@@ -151,9 +168,11 @@ function Notes() {
       return;
     }
 
-    const activeSession = localStorage.getItem("userSession");
-    const { email: sessionEmail } = JSON.parse(activeSession);
-    const studentId = sessionEmail.split("@")[0];
+    const studentId = getStudentId();
+    if (!studentId) {
+      toast.error("User session missing.");
+      return;
+    }
 
     setSavingCard(true);
     const toastId = toast.loading("Saving flashcard...");
@@ -163,7 +182,7 @@ function Notes() {
         .from("flashcards")
         .insert([
           {
-            subject_id: selectedSubjectId ? parseInt(selectedSubjectId) : null,
+            subject_id: selectedSubjectId ? parseInt(selectedSubjectId, 10) : null,
             question: questionInput.trim(),
             answer: answerInput.trim(),
             user_id: studentId,
