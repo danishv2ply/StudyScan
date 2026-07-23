@@ -1,0 +1,104 @@
+/* Container forced into a clean mobile layout shape */
+.mobile-frame {
+  max-width: 410px;
+  min-height: 90vh;
+  margin: 20px auto;
+  background-color: #111827; /* Dark modern theme matching your screenshot */
+  color: #ffffff;
+  padding: 24px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  border-radius: 30px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.hero-card {
+  background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+  color: white;
+  padding: 16px;
+  border-radius: 16px;
+  margin-bottom: 24px;
+  text-align: center;
+}
+.hero-card h3 { margin: 0 0 4px 0; font-size: 18px; }
+.hero-card p { margin: 0; font-size: 13px; opacity: 0.9; }
+
+.section-title {
+  font-size: 16px;
+  color: #9ca3af;
+  margin-bottom: 16px;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+/* Beautiful 2-Column Mobile Grid for Features */
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  margin-bottom: 80px; /* Space so it doesn't overlap the bottom nav */
+}
+
+.menu-card {
+  background: #1f2937;
+  border: 1px solid #374151;
+  border-radius: 16px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.menu-card:hover {
+  transform: translateY(-3px);
+  background: #2563eb; /* Changes color slightly on hover */
+}
+.menu-card span {
+  margin-top: 10px;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.icon-box {
+  padding: 12px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.purple { background-color: #3b0764; color: #c084fc; }
+.blue { background-color: #172554; color: #60a5fa; }
+
+/* Fixed Bottom Navigation Bar styling */
+.bottom-nav {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #1f2937;
+  border-top: 1px solid #374151;
+  border-radius: 0 0 30px 30px;
+  display: flex;
+  justify-content: space-around;
+  padding: 12px 0;
+}
+
+.bottom-nav a {
+  text-decoration: none;
+  color: #9ca3af;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 12px;
+}
+.bottom-nav a:hover {
+  color: #6366f1;
+}
+.bottom-nav p {
+  margin: 4px 0 0 0;
+}
