@@ -53,19 +53,20 @@ function Home() {
         setUsername(studentId);
       }
 
-      // 3. Fetch Live Analytics Stats
+      // 3. Fetch Live Analytics Stats (Supporting user_id OR email matching)
       try {
         const [subjectsRes, notesRes, flashcardsRes] = await Promise.all([
-          supabase.from("subjects").select("id", { count: "exact" }).eq("user_id", studentId),
-          supabase.from("notes").select("id", { count: "exact" }).eq("user_id", studentId),
-          supabase.from("flashcards").select("id", { count: "exact" }).eq("user_id", studentId)
+          supabase.from("subjects").select("*").or(`user_id.eq.${studentId},user_id.eq.${email}`),
+          supabase.from("notes").select("*").or(`user_id.eq.${studentId},user_id.eq.${email}`),
+          supabase.from("flashcards").select("*").or(`user_id.eq.${studentId},user_id.eq.${email}`)
         ]);
 
-        const totalScans = notesRes.count || notesRes.data?.length || 0;
-        const totalCards = flashcardsRes.count || flashcardsRes.data?.length || 0;
+        const totalSubjects = subjectsRes.data?.length || 0;
+        const totalScans = notesRes.data?.length || 0;
+        const totalCards = flashcardsRes.data?.length || 0;
 
         setStats({
-          subjectsCount: subjectsRes.count || subjectsRes.data?.length || 0,
+          subjectsCount: totalSubjects,
           scansCount: totalScans,
           flashcardsCount: totalCards
         });
@@ -135,7 +136,7 @@ function Home() {
         <span style={{ fontSize: "15px", fontWeight: "700" }}>My Notes & Flashcards</span>
       </div>
 
-      {/* STREAK COUNTER CARD (PLACED DIRECTLY UNDER NOTES & FLASHCARDS) */}
+      {/* STREAK COUNTER CARD */}
       <div style={{ background: "linear-gradient(135deg, #1e1b4b 0%, #311b92 100%)", border: "1px solid #4338ca", borderRadius: "18px", padding: "16px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "28px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
           <div style={{ background: "rgba(249, 115, 22, 0.2)", padding: "10px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
