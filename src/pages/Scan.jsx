@@ -18,6 +18,7 @@ function Scan() {
   const [saving, setSaving] = useState(false);
   const [generatingCards, setGeneratingCards] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
+  const [cooldown, setCooldown] = useState(0);
 
   // Enrolled Subjects State
   const [subjectsList, setSubjectsList] = useState([]);
@@ -27,11 +28,20 @@ function Scan() {
     fetchUserSubjects();
   }, []);
 
-  // Safe helper to extract numeric ID or handle text usernames
+  // Countdown timer for Rate Limit Cooldown
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const timer = setInterval(() => {
+      setCooldown((prev) => prev - 1);
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [cooldown]);
+
+  // Safe helper to extract raw student ID string (e.g. "apek123")
   const getSafeStudentId = (email) => {
     if (!email) return null;
-    const rawId = email.split("@")[0];
-    return !isNaN(rawId) && rawId !== "" ? parseInt(rawId, 10) : null;
+    return email.split("@")[0];
   };
 
   // Fetch Enrolled Modules for Subject Tagging
@@ -41,7 +51,7 @@ function Scan() {
 
     try {
       const { email: sessionEmail } = JSON.parse(activeSession);
-      const rawId = sessionEmail ? sessionEmail.split("@")[0] : null;
+      const rawId = getSafeStudentId(sessionEmail);
 
       if (!rawId) return;
 
@@ -111,8 +121,8 @@ function Scan() {
     setStatusMessage("");
   };
 
-  // Direct Gemini Call API with Retry Mechanism
-  const executeGeminiScanWithRetry = async (base64Data, retriesLeft = 2, delay = 2000) => {
+  // Direct Gemini Call API with Retry Mechanism & Rate Limit Handling
+  const executeGeminiScanWithRetry = async (base64Data, retriesLeft = 2, delay = 3000) => {
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY; 
     if (!apiKey) {
       throw new Error("VITE_GEMINI_API_KEY is missing from your .env file!");
@@ -156,9 +166,9 @@ function Scan() {
         } catch (_) {}
 
         if ((response.status === 429 || response.status === 503) && retriesLeft > 0) {
-          setStatusMessage(`Server busy. Retrying extraction loop... (${retriesLeft} left)`);
+          setStatusMessage(`Server busy/rate-limited. Waiting before retry... (${retriesLeft} left)`);
           await new Promise((res) => setTimeout(res, delay));
-          return await executeGeminiScanWithRetry(base64Data, retriesLeft - 1, delay * 1.5);
+          return await executeGeminiScanWithRetry(base64Data, retriesLeft - 1, delay * 2);
         }
         throw new Error(detailedError);
       }
@@ -172,12 +182,12 @@ function Scan() {
     } catch (err) {
       if (retriesLeft === 0) throw err;
       await new Promise((res) => setTimeout(res, delay));
-      return await executeGeminiScanWithRetry(base64Data, retriesLeft - 1, delay * 1.5);
+      return await executeGeminiScanWithRetry(base64Data, retriesLeft - 1, delay * 2);
     }
   };
 
   const handleStartScan = async () => {
-    if (!imagePreview) return;
+    if (!imagePreview || cooldown > 0) return;
 
     setLoading(true);
     setStatusMessage("Analyzing text structures via Gemini Flash...");
@@ -186,9 +196,15 @@ function Scan() {
       const parsedText = await executeGeminiScanWithRetry(imagePreview);
       setExtractedText(parsedText);
       setStatusMessage("");
+      setCooldown(5); // Start a 5-second buffer cooldown after successful call
     } catch (error) {
       console.error(error);
-      alert(`Gemini Extraction Failed: ${error.message}`);
+      if (error.message.includes("quota") || error.message.includes("429")) {
+        setCooldown(10); // Start 10-second cooldown on rate limit error
+        alert("⚠️ Rate limit reached! Please wait a few seconds before trying again.");
+      } else {
+        alert(`Gemini Extraction Failed: ${error.message}`);
+      }
       setStatusMessage("");
     } finally {
       setLoading(false);
@@ -205,8 +221,7 @@ function Scan() {
     const studentId = getSafeStudentId(sessionEmail);
 
     try {
-      const parsedSubjectId = selectedSubjectId ? parseInt(selectedSubjectId, 10) : null;
-      const matchedSubject = subjectsList.find(s => s.id === parsedSubjectId);
+      const matchedSubject = subjectsList.find(s => String(s.id) === String(selectedSubjectId));
       const noteTitle = matchedSubject 
         ? `${matchedSubject.code} Scan - ${new Date().toLocaleDateString()}` 
         : `Scan Note - ${new Date().toLocaleDateString()}`;
@@ -256,7 +271,13 @@ function Scan() {
         })
       });
 
-      if (!response.ok) throw new Error("Gemini AI request failed.");
+      if (!response.ok) {
+        if (response.status === 429) {
+          setCooldown(10);
+          throw new Error("Quota exceeded. Please wait a moment before generating flashcards.");
+        }
+        throw new Error("Gemini AI request failed.");
+      }
 
       const data = await response.json();
       const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
@@ -267,11 +288,9 @@ function Scan() {
       const { email: sessionEmail } = activeSession ? JSON.parse(activeSession) : { email: "" };
       const studentId = getSafeStudentId(sessionEmail);
 
-      const parsedSubjectId = selectedSubjectId ? parseInt(selectedSubjectId, 10) : null;
-
       // Insert generated flashcards into Supabase
       const payload = flashcardsArray.map(card => ({
-        subject_id: !isNaN(parsedSubjectId) ? parsedSubjectId : null,
+        subject_id: selectedSubjectId || null,
         question: card.question,
         answer: card.answer,
         user_id: studentId,
@@ -375,8 +394,30 @@ function Scan() {
           <FaSync size={13} /> {imagePreview ? "Change Photo" : "Choose Photo"}
         </button>
         
-        <button onClick={handleStartScan} disabled={loading || !imagePreview} style={{ flex: 2, background: !imagePreview ? "#4b5563" : "linear-gradient(135deg, #a855f7 0%, #9333ea 100%)", border: "none", borderRadius: "12px", padding: "14px", color: "#ffffff", fontWeight: "700", cursor: !imagePreview ? "default" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
-          <FaMagic size={14} /> {loading ? "Analyzing..." : "Extract Text"}
+        <button 
+          onClick={handleStartScan} 
+          disabled={loading || !imagePreview || cooldown > 0} 
+          style={{ 
+            flex: 2, 
+            background: (!imagePreview || cooldown > 0) ? "#4b5563" : "linear-gradient(135deg, #a855f7 0%, #9333ea 100%)", 
+            border: "none", 
+            borderRadius: "12px", 
+            padding: "14px", 
+            color: "#ffffff", 
+            fontWeight: "700", 
+            cursor: (!imagePreview || cooldown > 0) ? "default" : "pointer", 
+            display: "flex", 
+            alignItems: "center", 
+            justifyContent: "center", 
+            gap: "8px" 
+          }}
+        >
+          <FaMagic size={14} /> 
+          {loading 
+            ? "Analyzing..." 
+            : cooldown > 0 
+            ? `Wait (${cooldown}s)` 
+            : "Extract Text"}
         </button>
       </div>
 
@@ -406,10 +447,23 @@ function Scan() {
 
             <button 
               onClick={handleGenerateAIFlashcards} 
-              disabled={generatingCards}
-              style={{ width: "100%", background: "linear-gradient(135deg, #a855f7 0%, #6366f1 100%)", border: "none", borderRadius: "12px", padding: "14px", color: "#ffffff", fontWeight: "700", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}
+              disabled={generatingCards || cooldown > 0}
+              style={{ 
+                width: "100%", 
+                background: cooldown > 0 ? "#4b5563" : "linear-gradient(135deg, #a855f7 0%, #6366f1 100%)", 
+                border: "none", 
+                borderRadius: "12px", 
+                padding: "14px", 
+                color: "#ffffff", 
+                fontWeight: "700", 
+                cursor: cooldown > 0 ? "default" : "pointer", 
+                display: "flex", 
+                alignItems: "center", 
+                justifyContent: "center", 
+                gap: "8px" 
+              }}
             >
-              <FaBrain size={14} /> {generatingCards ? "Generating Cards..." : "Generate AI Flashcards"}
+              <FaBrain size={14} /> {generatingCards ? "Generating Cards..." : cooldown > 0 ? `Wait (${cooldown}s)` : "Generate AI Flashcards"}
             </button>
           </div>
         </div>
