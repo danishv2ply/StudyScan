@@ -17,17 +17,21 @@ function Register() {
     setLoading(true);
 
     try {
-      // 1. Check if user email already exists in Supabase 'users' table
+      // 1. Check if user email OR username already exists in Supabase 'users' table
       const { data: existingUser, error: checkError } = await supabase
         .from("users")
-        .select("email")
-        .eq("email", email)
+        .select("email, username")
+        .or(`email.eq.${email},username.eq.${username}`)
         .maybeSingle();
 
       if (checkError) throw checkError;
 
       if (existingUser) {
-        alert("❌ An account with this email already exists!");
+        if (existingUser.email === email) {
+          alert("❌ An account with this email already exists!");
+        } else {
+          alert("❌ This username is already taken! Please choose another one.");
+        }
         setLoading(false);
         return;
       }
