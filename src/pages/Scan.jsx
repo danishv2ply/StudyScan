@@ -1,12 +1,16 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import BottomNav from "../components/BottomNav";
-import { FaArrowLeft, FaCamera, FaMagic, FaSync, FaSave, FaBrain, FaBookOpen } from "react-icons/fa";
+import { FaArrowLeft, FaCamera, FaMagic, FaSync, FaSave, FaBrain } from "react-icons/fa";
 import { supabase } from "../supabaseClient";
 
 function Scan() {
   const navigate = useNavigate();
-  const fileInputRef = useRef(null);
+  
+  // 1. Separate Refs for Camera vs Gallery
+  const cameraInputRef = useRef(null);
+  const galleryInputRef = useRef(null);
+
   const [imagePreview, setImagePreview] = useState(null);
   const [extractedText, setExtractedText] = useState("");
   
@@ -46,7 +50,7 @@ function Scan() {
     }
   };
 
-  // 1. Client-Side Image Compressor
+  // Client-Side Image Compressor
   const compressImage = (file) => {
     return new Promise((resolve) => {
       const reader = new FileReader();
@@ -96,7 +100,7 @@ function Scan() {
     setStatusMessage("");
   };
 
-  // 2. Direct Gemini Call API with Retry Mechanism
+  // Direct Gemini Call API with Retry Mechanism
   const executeGeminiScanWithRetry = async (base64Data, retriesLeft = 2, delay = 2000) => {
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY; 
     if (!apiKey) {
@@ -180,7 +184,7 @@ function Scan() {
     }
   };
 
-  // 3. Save Extracted Text directly into Supabase 'notes' table
+  // Save Extracted Text directly into Supabase 'notes' table
   const handleSaveToNotes = async () => {
     if (!extractedText) return;
     setSaving(true);
@@ -214,7 +218,7 @@ function Scan() {
     }
   };
 
-  // 4. AI Flashcard Generator from Extracted Text
+  // AI Flashcard Generator from Extracted Text
   const handleGenerateAIFlashcards = async () => {
     if (!extractedText) return;
 
@@ -276,6 +280,26 @@ function Scan() {
   return (
     <div style={{ background: "#0f172a", minHeight: "100vh", color: "#ffffff", padding: "16px 20px", paddingBottom: "120px", boxSizing: "border-box", fontFamily: "-apple-system, sans-serif" }}>
       
+      {/* 2. HIDDEN FILE INPUTS */}
+      {/* (A) Camera Only Input */}
+      <input 
+        type="file" 
+        accept="image/*" 
+        capture="environment" 
+        ref={cameraInputRef} 
+        onChange={handleFileChange} 
+        style={{ display: "none" }} 
+      />
+
+      {/* (B) Gallery / File Selection Input */}
+      <input 
+        type="file" 
+        accept="image/*" 
+        ref={galleryInputRef} 
+        onChange={handleFileChange} 
+        style={{ display: "none" }} 
+      />
+
       {/* HEADER BAR */}
       <div style={{ display: "flex", alignItems: "center", gap: "16px", marginBottom: "20px", marginTop: "10px" }}>
         <button onClick={() => navigate("/home")} style={{ background: "#1e293b", border: "none", color: "#ffffff", padding: "10px", borderRadius: "50%", cursor: "pointer", display: "flex", alignItems: "center" }}>
@@ -310,37 +334,29 @@ function Scan() {
       <div style={{ background: "#1e293b", padding: "12px 16px", borderRadius: "12px", marginBottom: "20px", border: "1px solid #334155" }}>
         <div style={{ fontSize: "12px", color: "#a855f7", fontWeight: "700", textTransform: "uppercase", marginBottom: "6px", letterSpacing: "0.5px" }}>How to scan:</div>
         <ul style={{ margin: 0, paddingLeft: "18px", color: "#9ca3af", fontSize: "13px", lineHeight: "1.6" }}>
-          <li>Tap the camera container or click "Choose Photo" below.</li>
+          <li>Tap the camera container to open camera directly or click "Choose Photo" to select from Gallery.</li>
           <li>Ensure lighting is bright and handwriting or print text is legible.</li>
           <li>Click "Extract Text" to process and format your notes.</li>
         </ul>
       </div>
 
-      {/* PHOTO PREVIEW BOX */}
+      {/* PHOTO PREVIEW BOX (Triggers direct camera capture) */}
       <div style={{ width: "100%", background: "#1e293b", border: "2px dashed #4b5563", borderRadius: "20px", minHeight: "240px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", overflow: "hidden", position: "relative", marginBottom: "20px" }}>
         {imagePreview ? (
           <img src={imagePreview} alt="Scan Target" style={{ width: "100%", height: "100%", objectFit: "contain", maxHeight: "350px" }} />
         ) : (
-          <div style={{ textAlign: "center", padding: "20px", color: "#9ca3af", cursor: "pointer" }} onClick={() => fileInputRef.current.click()}>
+          <div style={{ textAlign: "center", padding: "20px", color: "#9ca3af", cursor: "pointer" }} onClick={() => cameraInputRef.current.click()}>
             <FaCamera size={40} style={{ color: "#a855f7", marginBottom: "12px" }} />
             <div style={{ fontSize: "14px", fontWeight: "600" }}>Tap to snap or upload study notes</div>
           </div>
         )}
-        
-        <input 
-          type="file" 
-          accept="image/*" 
-          capture="environment" 
-          ref={fileInputRef} 
-          onChange={handleFileChange} 
-          style={{ display: "none" }} 
-        />
       </div>
 
       {/* CONTROLS */}
       <div style={{ display: "flex", gap: "12px", marginBottom: "24px" }}>
-        <button onClick={() => fileInputRef.current.click()} style={{ flex: 1, background: "#334155", border: "1px solid #4b5563", borderRadius: "12px", padding: "14px", color: "#ffffff", fontWeight: "600", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
-          <FaSync size={13} /> {imagePreview ? "Retake" : "Choose Photo"}
+        {/* Gallery / File Picker Trigger Button */}
+        <button onClick={() => galleryInputRef.current.click()} style={{ flex: 1, background: "#334155", border: "1px solid #4b5563", borderRadius: "12px", padding: "14px", color: "#ffffff", fontWeight: "600", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
+          <FaSync size={13} /> {imagePreview ? "Change Photo" : "Choose Photo"}
         </button>
         
         <button onClick={handleStartScan} disabled={loading || !imagePreview} style={{ flex: 2, background: !imagePreview ? "#4b5563" : "linear-gradient(135deg, #a855f7 0%, #9333ea 100%)", border: "none", borderRadius: "12px", padding: "14px", color: "#ffffff", fontWeight: "700", cursor: !imagePreview ? "default" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
