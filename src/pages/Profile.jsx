@@ -16,7 +16,6 @@ import {
   FaFire,
   FaPalette,
   FaCheck,
-  FaInfoCircle,
   FaCheckDouble
 } from "react-icons/fa";
 
@@ -91,7 +90,7 @@ function Profile() {
 
       const studentId = sessionEmail.split("@")[0];
 
-      // Fetch Profile Data
+      // 1. Fetch Profile Data
       const { data: userData } = await supabase
         .from("users")
         .select("*")
@@ -106,7 +105,7 @@ function Profile() {
         setUsername(studentId);
       }
 
-      // Fetch Modules
+      // 2. Fetch Modules by studentId (matching user_id column)
       try {
         setLoadingModules(true);
         const { data: subjectsData, error: subjectsError } = await supabase
@@ -123,7 +122,7 @@ function Profile() {
         setLoadingModules(false);
       }
 
-      // Fetch Streak
+      // 3. Fetch Streak Activity
       try {
         const [notesRes, flashcardsRes] = await Promise.all([
           supabase.from("notes").select("id", { count: "exact" }).eq("user_id", studentId),
@@ -196,7 +195,7 @@ function Profile() {
   return (
     <div style={{ background: "#0f172a", minHeight: "100vh", color: "#ffffff", padding: "16px 20px", paddingBottom: "120px", boxSizing: "border-box", fontFamily: "-apple-system, sans-serif" }}>
       
-      {/* HEADER ROW WITH WORKING NOTIFICATION BELL */}
+      {/* HEADER ROW WITH NOTIFICATION BELL */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
           <div onClick={() => { setEditUsername(username); setIsModalOpen(true); }} style={{ position: "relative", cursor: "pointer" }}>
@@ -224,7 +223,7 @@ function Profile() {
         </div>
       </div>
 
-      {/* BANNER WITH DYNAMIC ACCENT GRADIENT */}
+      {/* BANNER WITH ACCENT GRADIENT */}
       <div style={{ width: "100%", background: activeThemeObj.gradient, borderRadius: "24px", padding: "28px 16px", marginBottom: "24px", boxSizing: "border-box", transition: "background 0.3s ease" }}>
         <div style={{ display: "flex", justifyContent: "center", marginBottom: "14px" }}>
           {profilePic ? (
@@ -284,10 +283,10 @@ function Profile() {
                 </div>
                 <div>
                   <div style={{ fontSize: "11px", color: activeThemeObj.primary, fontWeight: "700", textTransform: "uppercase" }}>
-                    {module.code || "MODULE"}
+                    {module.code}
                   </div>
                   <div style={{ fontSize: "14px", fontWeight: "700", color: "#ffffff" }}>
-                    {module.name || module.title || "Untitled Course"}
+                    {module.name}
                   </div>
                 </div>
               </div>
@@ -301,7 +300,7 @@ function Profile() {
         <FaSignOutAlt size={16} /> Sign Out from StudyScan
       </button>
 
-      {/* 🔔 NOTIFICATIONS MODAL */}
+      {/* NOTIFICATIONS MODAL */}
       {isNotifOpen && (
         <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(15, 23, 42, 0.85)", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px", zIndex: 9999 }}>
           <div style={{ background: "#1e293b", border: "1px solid #374151", borderRadius: "24px", width: "100%", maxWidth: "380px", padding: "20px", boxSizing: "border-box" }}>
@@ -313,7 +312,6 @@ function Profile() {
               <button onClick={() => setIsNotifOpen(false)} style={{ background: "none", border: "none", color: "#9ca3af", cursor: "pointer" }}><FaTimes size={18} /></button>
             </div>
 
-            {/* NOTIFICATION LIST */}
             <div style={{ display: "flex", flexDirection: "column", gap: "10px", maxHeight: "300px", overflowY: "auto", marginBottom: "16px" }}>
               {notifications.map((n) => (
                 <div 
@@ -334,7 +332,6 @@ function Profile() {
               ))}
             </div>
 
-            {/* MARK ALL READ BUTTON */}
             {unreadCount > 0 && (
               <button 
                 onClick={markAllNotifsAsRead}
