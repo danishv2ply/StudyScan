@@ -27,19 +27,30 @@ function Scan() {
     fetchUserSubjects();
   }, []);
 
+  // Safe helper to extract numeric ID or handle text usernames
+  const getSafeStudentId = (email) => {
+    if (!email) return null;
+    const rawId = email.split("@")[0];
+    return !isNaN(rawId) && rawId !== "" ? parseInt(rawId, 10) : null;
+  };
+
   // Fetch Enrolled Modules for Subject Tagging
   const fetchUserSubjects = async () => {
     const activeSession = localStorage.getItem("userSession");
     if (!activeSession) return;
 
-    const { email: sessionEmail } = JSON.parse(activeSession);
-    const studentId = sessionEmail.split("@")[0];
-
     try {
-      const { data } = await supabase
+      const { email: sessionEmail } = JSON.parse(activeSession);
+      const rawId = sessionEmail ? sessionEmail.split("@")[0] : null;
+
+      if (!rawId) return;
+
+      const { data, error } = await supabase
         .from("subjects")
         .select("*")
-        .eq("user_id", studentId);
+        .eq("user_id", rawId);
+
+      if (error) throw error;
 
       setSubjectsList(data || []);
       if (data && data.length > 0) {
@@ -191,17 +202,20 @@ function Scan() {
 
     const activeSession = localStorage.getItem("userSession");
     const { email: sessionEmail } = activeSession ? JSON.parse(activeSession) : { email: "" };
-    const studentId = sessionEmail.split("@")[0];
+    const studentId = getSafeStudentId(sessionEmail);
 
     try {
-      const matchedSubject = subjectsList.find(s => s.id === parseInt(selectedSubjectId));
-      const noteTitle = matchedSubject ? `${matchedSubject.code} Scan - ${new Date().toLocaleDateString()}` : `Scan Note - ${new Date().toLocaleDateString()}`;
+      const parsedSubjectId = selectedSubjectId ? parseInt(selectedSubjectId, 10) : null;
+      const matchedSubject = subjectsList.find(s => s.id === parsedSubjectId);
+      const noteTitle = matchedSubject 
+        ? `${matchedSubject.code} Scan - ${new Date().toLocaleDateString()}` 
+        : `Scan Note - ${new Date().toLocaleDateString()}`;
 
       const { error } = await supabase.from("notes").insert([
         {
           title: noteTitle,
           scanned_text: extractedText,
-          user_id: studentId ? parseInt(studentId) : null,
+          user_id: studentId,
           created_at: new Date().toISOString()
         }
       ]);
@@ -251,14 +265,16 @@ function Scan() {
 
       const activeSession = localStorage.getItem("userSession");
       const { email: sessionEmail } = activeSession ? JSON.parse(activeSession) : { email: "" };
-      const studentId = sessionEmail.split("@")[0];
+      const studentId = getSafeStudentId(sessionEmail);
+
+      const parsedSubjectId = selectedSubjectId ? parseInt(selectedSubjectId, 10) : null;
 
       // Insert generated flashcards into Supabase
       const payload = flashcardsArray.map(card => ({
-        subject_id: selectedSubjectId ? parseInt(selectedSubjectId) : null,
+        subject_id: !isNaN(parsedSubjectId) ? parsedSubjectId : null,
         question: card.question,
         answer: card.answer,
-        user_id: parseInt(studentId),
+        user_id: studentId,
         created_at: new Date().toISOString()
       }));
 
